@@ -50,7 +50,16 @@ Take a moment to explore the generated files:
 - `src/bestmlops/__init__.py`: This is the main entry point for
 your MLOps project. You can add your code here or create additional modules as needed.
 - '.venv/': This directory contains the virtual environment created by `uv`. It isolates your project dependencies from the global Python environment.
-- `.python-verision`: This file specifies the Python version used in your project. It is automatically created by `uv` based on the version you specified during initialization.
+- `.python-version`: This file specifies the Python version used in your project. It is automatically created by `uv` based on the version you specified during initialization.
+
+### 1.3. Define your `.gitignore`
+
+During development we create and generate a lot of files that we do not want to commit to our Git repository. Git makes it easy to ignore these files by using a `.gitignore` file. This file tells Git which files and directories to ignore when committing changes.
+
+You can write your own `.gitignore` file, but this is a task that many programmers have already come across, and as such there is a more or less standard `.gitignore` file that you can use for Python projects. You can find it [here](https://github.com/github/gitignore/blob/main/Python.gitignore). This repository contains a collection of `.gitignore` files for various programming languages and frameworks, which you might find useful in the future.
+
+For now, create a `.gitignore` file in the root of your project and copy the contents of the Python `.gitignore` file from the link above into it.
+
 
 ---
 

@@ -1,0 +1,18 @@
+[project]
+name = "bestmlops"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Kristof Drexler", email = "kristof.drexler@kauza.dk" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+bestmlops = "bestmlops:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
