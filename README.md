@@ -151,6 +151,16 @@ uv run pre-commit run --all-files
 Write some code in the `src/bestmlops/__init__.py` file and try to run the `ruff` and `mypy` manually. Also try committing your code using `git` and see the pre-commit hooks in action.
 
 
+#### TIP
+If you are getting tired of haveing to type `uv run` before every command, you can activate the virtual environment created by `uv` by running the following command:
+
+```sh
+source .venv/bin/activate
+```
+This makes all the scripts you have added available in your terminal. Try running `ruff`, `mypy`, and `pre-commit` commands now.
+
+I will henceforth assume you have the virtual environment activated, so the commands I will provide will not include the `uv run` prefix where not needed.
+
 ---
 
 ## 3. Let's write some code!
@@ -306,19 +316,91 @@ fastapi dev src/bestmlops/api.py --port 8070
 ```
 Experiment a bit with the API by visiting it on the port you defined. Try removing the `--port` flag, which port does FastAPI use by default?
 
-### 4.2. Creating the model endpoint
+
+#### TIP
+navigate to the `/docs` page on the fastapi app.
+
+As you can see here, the functions defined in `api.py` are automatically created as endpoints and documented by FastAPI. This is one of the many features that make FastAPI a great choice for building APIs. Right now you have two `GET` endpoints, the next step is creating an endpoint where you can upload images to and get the model's predictions back. This will require a `POST` endpoint.
+
+### 4.2. Creating the model inference endpoint
 
 #### Exercise
 Now that you have a feel for how FastAPI works, create an endpoint for the model. For inspiration, take a look at the `local_deploy.py` file we created earlier. You can use the `classify_digit` function from the `model.py` file to process the image input and return the predictions.
 
+#### TIP
+To be able to upload images to the API, add these lines to your `api.py` file to get started:
+
+```python
+# import necessary libraries
+from io import BytesIO
+import numpy as np
+from fastapi import UploadFile
+from PIL import Image
+
+# You existing FastAPI code...
+# ...
+# ...
+
+@app.post("/infer/")
+async def infer(file: UploadFile):
+    # Read the file contents
+    contents = await file.read()
+    # Convert it to a numpy array
+    image = np.array(Image.open(BytesIO(contents)))
+
+    # Add your own logic here to classify the digit!
+    # Don't forget to return the predictions!
 
 
-### 4.2. Train a Model
+# you will probably want to be able to debug
+# your FastAPI app locally, so add this at the end of your file:
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, port=8071)
+```
 
-- Use Hugging Face Transformers or your preferred ML library.
-- Save your trained model to the `models/` directory.
+<details>
+  <summary>SPOILER: solution here</summary>
 
----
+```python
+from io import BytesIO
+from typing import Union
+
+import numpy as np
+from fastapi import FastAPI, UploadFile
+from PIL import Image
+
+from bestmlops.model import classify_digit
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: Union[str, None] = None):
+    return {"item_id": item_id, "q": q}
+
+
+@app.post("/infer/")
+async def infer(file: UploadFile):
+    contents = await file.read()
+    image = np.array(Image.open(BytesIO(contents)))
+
+    predictions = classify_digit(image)
+    return {"predictions": predictions}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, port=8071)
+
+```
+</details>
 
 ## 5. Serving with FastAPI
 
@@ -332,7 +414,7 @@ Now that you have a feel for how FastAPI works, create an endpoint for the model
     def read_root():
         return {"Hello": "World"}
 
-    # You can extend this with endpoints for inference
+
     ```
 - Run locally:
     ```sh
