@@ -531,7 +531,7 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ secrets.GHCR_TOKEN }}
 
     - name: Build and push
       run: |
@@ -539,6 +539,10 @@ jobs:
         docker build -t $IMAGE .
         docker push $IMAGE
 ```
+
+In order for this to work properly, you need to create a new token called `GHCR_TOKEN` with `write:packages` and `read:org` permissions. See the below image as a reference. Create tokens [here](https://github.com/settings/tokens).
+
+![alt text](image.png)
 
 Once you commit this file. You should see the newly defined workflow on the project repository under the "Actions" tab. Test this workflow by creating a new release on GitHub. This will trigger the workflow and build your Docker image, which will then be pushed to the GitHub Container Registry.
 
