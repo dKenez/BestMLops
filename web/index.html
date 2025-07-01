@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas Inference</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            touch-action: none;
+        }
+    </style>
+</head>
+
+<body style="width: 100%; display: flex; flex-direction: column; align-items: center; font-family: Arial, sans-serif;">
+    <div>
+
+        <h2 style="width: 280px; text-align: center;">Draw something</h2>
+        <div style="display: flex; gap: 2px; padding-bottom: 5px;">
+            <canvas id="canvas" width="280" height="280"></canvas><br>
+            <div id="bar-container"
+            style="width: 300px; height: 280px; display: flex; flex-direction: column; justify-content: center; ">
+            <!-- Bars will be dynamically inserted here -->
+            </div>
+        </div>
+        <button onclick="submit()">Submit</button>
+        <button onclick="reset()">Reset</button>
+        <p id="result"></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 15;
+        ctx.lineCap = 'round';
+
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', e => {
+            drawing = true;
+            ctx.beginPath(); // <--- add this
+            const rect = canvas.getBoundingClientRect();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mouseout', () => drawing = false);
+
+        function draw(e) {
+            if (!drawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        async function submit() {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            const formData = new FormData();
+            formData.append('file', blob, 'drawing.png');
+
+            const res = await fetch('http://localhost:8070/infer/', {
+                method: 'POST',
+                body: formData,
+            });
+            const json = await res.json();
+            const top = Object.entries(json.predictions).reduce((a, b) => (b[1] > a[1] ? b : a));
+            document.getElementById('result').innerText = 'Prediction: ' + top[0];
+            renderBars(json.predictions);
+        }
+
+        async function reset() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('result').innerText = '';
+            clearBars();
+        }
+
+        function clearBars() {
+            const container = document.getElementById('bar-container');
+            container.innerHTML = ''; // clear previous bars
+        }
+        function renderBars(predictions) {
+            const container = document.getElementById('bar-container');
+            container.innerHTML = ''; // clear previous bars
+
+            Object.entries(predictions).forEach(([digit, prob]) => {
+                const barWrapper = document.createElement('div');
+                barWrapper.style.display = 'flex';
+                barWrapper.style.alignItems = 'center';
+                barWrapper.style.marginBottom = '4px';
+
+                const label = document.createElement('div');
+                label.textContent = digit;
+                label.style.width = '20px';
+
+                const bar = document.createElement('div');
+                bar.style.height = '20px';
+                bar.style.width = `${prob * 100}%`; // scale to percent
+                bar.style.backgroundColor = '#4CAF50';
+                bar.style.marginLeft = '10px';
+
+                // const percentText = document.createElement('div');
+                // percentText.textContent = `${(prob * 100).toFixed(1)}%`;
+                // percentText.style.marginLeft = '10px';
+                // percentText.style.minWidth = '40px';
+
+                barWrapper.appendChild(label);
+                barWrapper.appendChild(bar);
+                // barWrapper.appendChild(percentText);
+
+                container.appendChild(barWrapper);
+            });
+        }
+    </script>
+</body>
+
+</html>
