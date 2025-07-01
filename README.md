@@ -503,32 +503,42 @@ docker ps -a
 
 ## 6. CI/CD with GitHub Actions
 
+GitHub Actions is a powerful tools that allows you to run automated tasks on predefined triggers. In our case we want to automatically build our Docker image whenever we push changes to the main branch of our repository. This way, we can ensure that our application is always up-to-date and ready for deployment.
+
+Workflows are a great way to perform linting, tests, or any number of tasks on your codebase. In our case, we will create a workflow that builds and pushes our Docker image to the GitHub Container Registry (GHCR) whenever we create a new release.
+
 - Create `.github/workflows/ci.yml`:
-    ```yaml
-    name: CI
+```yaml
+name: Build Docker Image
 
-    on: [push, pull_request]
+on:
+  release:
+    types: [published]
 
-    jobs:
-      build:
-        runs-on: ubuntu-latest
-        steps:
-        - uses: actions/checkout@v3
-        - uses: actions/setup-python@v5
-          with:
-            python-version: '3.9'
-        - name: Install UV
-          run: pip install uv
-        - name: Install dependencies
-          run: uv pip install -r requirements.txt
-        - name: Lint
-          run: ruff check .
-        - name: Type Check
-          run: ty
-        - name: Test
-          run: pytest
-    ```
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push
+      run: |
+        IMAGE=ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+        docker build -t $IMAGE .
+        docker push $IMAGE
+```
 ---
 
 ## 7. Next Steps & Resources
