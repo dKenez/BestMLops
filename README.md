@@ -579,7 +579,7 @@ app.add_middleware(
 )
 ```
 
-Create a file `web/index.html` and paste in the code from the repository. This is a simple HTML page that allows you to draw a digit on a canvas and submit it to the API for classification. The results are displayed as a bar chart.
+Create a file `web/index.html` and paste in the content of [this file](https://github.com/dKenez/BestMLops/blob/master/web/index.html). This is a simple HTML page that allows you to draw a digit on a canvas and submit it to the API for classification. The results are displayed as a bar chart.
 
 You can then run a simple HTTP server to serve the static files. You can use Python's built-in HTTP server for this:
 
