@@ -531,20 +531,24 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_TOKEN }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push
       run: |
-        IMAGE=ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
-        docker build -t $IMAGE .
-        docker push $IMAGE
+            REPO=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+            IMAGE=ghcr.io/$REPO:${{ github.event.release.tag_name }}
+            docker build -t $IMAGE .
+            docker push $IMAGE
+
 ```
 
-In order for this to work properly, you need to create a new token called `GHCR_TOKEN` with `write:packages` and `read:org` permissions. See the below image as a reference. Create tokens [here](https://github.com/settings/tokens).
+Once you push this commit. You should see the newly defined workflow on the project repository under the "Actions" tab.
 
-![alt text](image.png)
+In order for this to work properly, you navigate to your repositories settings page, and under the Actions > General find the "Workflow permissions" section. Make sure that the "Read and write permissions" option is selected. This will allow the workflow to push the Docker image to the GitHub Container Registry.
 
-Once you commit this file. You should see the newly defined workflow on the project repository under the "Actions" tab. Test this workflow by creating a new release on GitHub. This will trigger the workflow and build your Docker image, which will then be pushed to the GitHub Container Registry.
+Test the new workflow by creating a new release on GitHub. This will trigger the workflow and build your Docker image, which will then be pushed to the GitHub Container Registry.
+
+Once the workflow finished running, you will find the container image under packages.
 
 ---
 
