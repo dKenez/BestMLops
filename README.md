@@ -14,6 +14,10 @@ This guide is designed to be beginner-friendly, so you can follow along even if 
 
 While you are expected to follow along this guide, you can also find the complete code in this GitHub repository (using the the Github Tags, you can find the code for each step of the course):
 
+###
+
+This course would not have been possible without the Course that kickstarted my MLOps journey, do check it out here: [DTU-MLOps](https://skaftenicki.github.io/dtu_mlops/). It covers a wide range of topics and provides a solid foundation for building MLOps pipelines. A lot more is covered there than was possible in this short course.
+
 ---
 
 ## 1. Project Initialization
@@ -552,20 +556,65 @@ Once the workflow finished running, you will find the container image under pack
 
 ---
 
-## 7. Next Steps & Resources
+## 7. Creating a frontend
 
-- Extend FastAPI with prediction endpoints.
-- Automate model retraining and deployment.
-- Explore Hugging Face Spaces for deployment.
+While this course is focused on MLOps, it is worth creating a simple frontend to interact with our API. This will give you an overview of how these different component work together in a real-world application.
+
+There is a small update that needs to be made to the `api.py` file to allow CORS (Cross-Origin Resource Sharing) requests from the frontend. This is necessary because the frontend will be running on a different domain (or port) than the API.
+
+To allow CORS requests, we will use the `fastapi.middleware.cors` module. Add the following lines to your `api.py` file:
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+# the rest of your imports...
+
+app = FastAPI() # <-- this already exists in your file
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all origins (in real life you should specify the frontend URL)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+Create a file `web/index.html` and paste in the code from the repository. This is a simple HTML page that allows you to draw a digit on a canvas and submit it to the API for classification. The results are displayed as a bar chart.
+
+You can then run a simple HTTP server to serve the static files. You can use Python's built-in HTTP server for this:
+
+```sh
+cd web
+python3 -m http.server 8060
+```
+
+
+## 8. Next Steps & Resources
+
+Congratulations! You have completed the MLOps introductory course. You have learned how to set up a basic MLOps workflow using modern Python tooling and best practices. You have also learned how to containerize your FastAPI application and deploy it using GitHub Actions.
+
+To continue your MLOps journey, here are some next steps you can take:
+
+- Explore some of the more advance functionality of `uv`, `ruff`, `mypy`, and `pre-commit`.
+- Search for a different model on Hugging Face and try to deploy it using the same workflow.
+- Extend FastAPI with prediction endpoints, add authentication, and more.
+- Automate model retraining and deployment in GitHub Actions.
 - Integrate monitoring/logging (e.g., Prometheus, Grafana).
 
 **References:**
 - [UV Docs](https://github.com/astral-sh/uv)
 - [Ruff Docs](https://docs.astral.sh/ruff/)
-- [Ty Docs](https://github.com/tiangolo/ty)
 - [Hugging Face](https://huggingface.co/docs)
 - [FastAPI Docs](https://fastapi.tiangolo.com/)
 - [Docker Docs](https://docs.docker.com/)
 - [GitHub Actions](https://docs.github.com/en/actions)
+
+**Inspiration**
+
+This course was greatly inspired by the awesome DTU-MLOps course by SkafteNicki on Github: [DTU-MLOps](https://skaftenicki.github.io/dtu_mlops/). If you are looking for a more comprehensive course on MLOps, I highly recommend checking it out. It covers a wide range of topics and provides a solid foundation for building MLOps pipelines.
+
+A lot more is covered there than was possible in this short course.
+
+**Thank you for taking this course!** I hope you found it helpful and informative. If you have any questions or feedback, feel free to reach out to me on GitHub or via email.
 
 Happy MLOps-ing!
