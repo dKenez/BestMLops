@@ -14,6 +14,10 @@ This guide is designed to be beginner-friendly, so you can follow along even if 
 
 While you are expected to follow along this guide, you can also find the complete code in this GitHub repository (using the the Github Tags, you can find the code for each step of the course):
 
+###
+
+This course would not have been possible without the Course that kickstarted my MLOps journey, do check it out here: [DTU-MLOps](https://skaftenicki.github.io/dtu_mlops/). It covers a wide range of topics and provides a solid foundation for building MLOps pipelines. A lot more is covered there than was possible in this short course.
+
 ---
 
 ## 1. Project Initialization
@@ -150,6 +154,7 @@ uv run pre-commit run --all-files
 #### Exercise
 Write some code in the `src/bestmlops/__init__.py` file and try to run the `ruff` and `mypy` manually. Also try committing your code using `git` and see the pre-commit hooks in action.
 
+*As you progress through this course, don't forget to regularly commit your code!*
 
 #### TIP
 If you are getting tired of haveing to type `uv run` before every command, you can activate the virtual environment created by `uv` by running the following command:
@@ -374,12 +379,12 @@ from bestmlops.model import classify_digit
 
 app = FastAPI()
 
-
+# you can get rid of the two original endpoints if you want
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
-
+# you can get rid of the two original endpoints if you want
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: Union[str, None] = None):
     return {"item_id": item_id, "q": q}
@@ -402,90 +407,214 @@ if __name__ == "__main__":
 ```
 </details>
 
-## 5. Serving with FastAPI
+## 5. Dockerizing the API
 
-- Create `main.py`:
-    ```python
-    from fastapi import FastAPI
+We have reached a point where most of our business logic has been implmented and working. This next step will talk about how to deploy our API and use it in production.
 
-    app = FastAPI()
+As is abundantly obvious from the title of this course, containerization was bound to make an appearance. We will use Docker to containerize our FastAPI application, making it easy to deploy and run in any environment.
 
-    @app.get("/")
-    def read_root():
-        return {"Hello": "World"}
+You should already have `Docker` installed on your machine. If not, please follow the [installation instructions](https://docs.docker.com/get-docker/) for your platform.
+
+### 5.1. The Dockerfile
+
+Docker, being a containerization technology, revolves around the concept of containers. A container is a lightweight, standalone, machine that  that includes everything needed to run a piece of software, including the code, runtime, libraries, and dependencies.
+
+To create our own Docker container, we need to define a `Dockerfile`. This file contains declarative instructions for Docker to build our container image.
+
+To get started, create a new file named `Dockerfile` in the root of your project directory. This file will contain the instructions for building our FastAPI application container.
+
+`uv` was built with Docker in mind, and provides a guide for containerizing your `uv` application. You can find that documentation [here](https://docs.astral.sh/uv/guides/integration/docker/).
 
 
-    ```
-- Run locally:
-    ```sh
-    uvicorn main:app --reload
-    ```
+```dockerfile
+# Let's start with a base image supplied by Astral.sh (creators of uv)
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+# Some optimizations for uv
+# https://docs.astral.sh/uv/guides/integration/docker/#optimizations
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 
----
+# set our working directory to /app
+WORKDIR /app
 
-## 6. Dockerize the Application
+# copy our local src directory to /app/src in the container
+ADD src src
 
-- Create a `Dockerfile`:
-    ```dockerfile
-    FROM python:3.9-slim
-    WORKDIR /app
-    COPY requirements.txt .
-    RUN pip install --no-cache-dir -r requirements.txt
-    COPY . .
-    CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
-    ```
+# uv requires a README.md file to present
+# so we just create an empty one
+RUN touch README.md
+
+# Install dependencies
+# we are using our local cache to speed up the build process
+# and bind mount the uv.lock and pyproject.toml files
+# this means that those files are not copied into the container
+# but are used directly from the host machine
+RUN --mount=type=cache,target=/root/.cache/uv \
+  --mount=type=bind,source=uv.lock,target=uv.lock \
+  --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+  uv sync --frozen
+
+# Add the newly created virtual environment to the PATH
+# so that we can use
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Let the container know that port 8000 is exposed
+# this is the default port for FastAPI
+EXPOSE 8000
+
+# Set the entrypoint to run the FastAPI application
+# on container startup
+ENTRYPOINT ["fastapi", "run", "/app/src/bestmlops/api.py"]
+```
+
+- Build the image:
+```sh
+docker build -f Dockerfile -t bestmlops:latest .
+
+# You can see all your images by running:
+docker images
+```
+- Run the container:
+```sh
+docker run -p 8070:8000 --name bestmlops bestmlops:latest
+```
+
+There are numerous options for optimizing your Dockerfile, and subsequently running the resulting container. It is worth perusing the [Docker documentation](https://docs.docker.com/) to learn more about best practices for building and running Docker containers.
+
+You are now running your FastAPI application in a Docker container! This lets you quickly deploy on any machine that has docker installed, or even in the cloud. Should you want to, you can also deploy 10 instances of this container on a single machine, and have them all run independently of each other. This is one of the main benefits of using Docker for deploying applications.
+
+Try it out:
+
 - Build and run:
-    ```sh
-    docker build -t mlops-app .
-    docker run -p 80:80 mlops-app
-    ```
+```sh
+docker run -d -p 8071:8000 --name bestmlops_copy1 bestmlops:latest
+docker run -d -p 8072:8000 --name bestmlops_copy2 bestmlops:latest
+docker run -d -p 8073:8000 --name bestmlops_copy3 bestmlops:latest
+```
+
+The `-d` flag runs the container in detached mode, so it doesn't block your terminal. You can see all the running docker instances by running:
+
+```sh
+docker ps
+```
+
+Or run the following to see stopped containers as well:
+```sh
+docker ps -a
+```
+
 
 ---
 
-## 7. CI/CD with GitHub Actions
+## 6. CI/CD with GitHub Actions
 
-- Create `.github/workflows/ci.yml`:
-    ```yaml
-    name: CI
+GitHub Actions is a powerful tools that allows you to run automated tasks on predefined triggers. In our case we want to automatically build our Docker image whenever we push changes to the main branch of our repository. This way, we can ensure that our application is always up-to-date and ready for deployment.
 
-    on: [push, pull_request]
+Workflows are a great way to perform linting, tests, or any number of tasks on your codebase. In our case, we will create a workflow that builds and pushes our Docker image to the GitHub Container Registry (GHCR) whenever we create a new release.
 
-    jobs:
-      build:
-        runs-on: ubuntu-latest
-        steps:
-        - uses: actions/checkout@v3
-        - uses: actions/setup-python@v5
-          with:
-            python-version: '3.9'
-        - name: Install UV
-          run: pip install uv
-        - name: Install dependencies
-          run: uv pip install -r requirements.txt
-        - name: Lint
-          run: ruff check .
-        - name: Type Check
-          run: ty
-        - name: Test
-          run: pytest
-    ```
+- Create `.github/workflows/release.yml`:
+```yaml
+name: Build Docker Image
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push
+      run: |
+            REPO=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+            IMAGE=ghcr.io/$REPO:${{ github.event.release.tag_name }}
+            docker build -t $IMAGE .
+            docker push $IMAGE
+
+```
+
+Once you push this commit. You should see the newly defined workflow on the project repository under the "Actions" tab.
+
+In order for this to work properly, you navigate to your repositories settings page, and under the Actions > General find the "Workflow permissions" section. Make sure that the "Read and write permissions" option is selected. This will allow the workflow to push the Docker image to the GitHub Container Registry.
+
+Test the new workflow by creating a new release on GitHub. This will trigger the workflow and build your Docker image, which will then be pushed to the GitHub Container Registry.
+
+Once the workflow finished running, you will find the container image under packages.
 
 ---
+
+## 7. Creating a frontend
+
+While this course is focused on MLOps, it is worth creating a simple frontend to interact with our API. This will give you an overview of how these different component work together in a real-world application.
+
+There is a small update that needs to be made to the `api.py` file to allow CORS (Cross-Origin Resource Sharing) requests from the frontend. This is necessary because the frontend will be running on a different domain (or port) than the API.
+
+To allow CORS requests, we will use the `fastapi.middleware.cors` module. Add the following lines to your `api.py` file:
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+# the rest of your imports...
+
+app = FastAPI() # <-- this already exists in your file
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all origins (in real life you should specify the frontend URL)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+Create a file `web/index.html` and paste in the content of [this file](https://github.com/dKenez/BestMLops/blob/master/web/index.html). This is a simple HTML page that allows you to draw a digit on a canvas and submit it to the API for classification. The results are displayed as a bar chart.
+
+You can then run a simple HTTP server to serve the static files. You can use Python's built-in HTTP server for this:
+
+```sh
+cd web
+python3 -m http.server 8060
+```
+
 
 ## 8. Next Steps & Resources
 
-- Extend FastAPI with prediction endpoints.
-- Automate model retraining and deployment.
-- Explore Hugging Face Spaces for deployment.
+Congratulations! You have completed the MLOps introductory course. You have learned how to set up a basic MLOps workflow using modern Python tooling and best practices. You have also learned how to containerize your FastAPI application and deploy it using GitHub Actions.
+
+To continue your MLOps journey, here are some next steps you can take:
+
+- Explore some of the more advance functionality of `uv`, `ruff`, `mypy`, and `pre-commit`.
+- Search for a different model on Hugging Face and try to deploy it using the same workflow.
+- Extend FastAPI with prediction endpoints, add authentication, and more.
+- Automate model retraining and deployment in GitHub Actions.
 - Integrate monitoring/logging (e.g., Prometheus, Grafana).
 
 **References:**
 - [UV Docs](https://github.com/astral-sh/uv)
 - [Ruff Docs](https://docs.astral.sh/ruff/)
-- [Ty Docs](https://github.com/tiangolo/ty)
 - [Hugging Face](https://huggingface.co/docs)
 - [FastAPI Docs](https://fastapi.tiangolo.com/)
 - [Docker Docs](https://docs.docker.com/)
 - [GitHub Actions](https://docs.github.com/en/actions)
+
+**Inspiration**
+
+This course was greatly inspired by the awesome DTU-MLOps course by SkafteNicki on Github: [DTU-MLOps](https://skaftenicki.github.io/dtu_mlops/). If you are looking for a more comprehensive course on MLOps, I highly recommend checking it out. It covers a wide range of topics and provides a solid foundation for building MLOps pipelines.
+
+A lot more is covered there than was possible in this short course.
+
+**Thank you for taking this course!** I hope you found it helpful and informative. If you have any questions or feedback, feel free to reach out to me on GitHub or via email.
 
 Happy MLOps-ing!
