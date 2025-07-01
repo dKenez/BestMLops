@@ -7,10 +7,16 @@ authors = [
     { name = "Kristof Drexler", email = "kristof.drexler@kauza.dk" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "gradio>=5.35.0",
+    "pillow>=11.2.1",
+    "torch>=2.7.1",
+    "transformers>=4.53.0",
+]
 
 [project.scripts]
 bestmlops = "bestmlops:main"
+local_deploy = "bestmlops.local_deploy:deploy_model"
 
 [build-system]
 requires = ["hatchling"]

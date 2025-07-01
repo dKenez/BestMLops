@@ -147,44 +147,171 @@ This will ensure that the pre-commit hooks are installed and will run automatica
 uv run pre-commit run --all-files
 ```
 
+#### Exercise
+Write some code in the `src/bestmlops/__init__.py` file and try to run the `ruff` and `mypy` manually. Also try committing your code using `git` and see the pre-commit hooks in action.
+
 
 ---
 
-## 3. Code Quality: Ruff and Ty
+## 3. Let's write some code!
 
-### 3.1. Ruff (Linting)
+### 3.1. Our First Model
 
-- Add to your `pyproject.toml`:
-    ```toml
-    [tool.ruff]
-    line-length = 88
-    target-version = "py39"
-    ```
-- Run:
-    ```sh
-    ruff check .
-    ```
+Naturally to do MLOps, we need a model to work with. Due to time constraints, we will not go deep into training models, instead we will use a pre-trained model from Hugging Face, a popular platform for sharing all things machine learning. If you don't need a bespoke model, chances are you can find a pre-trained model on Hugging Face that suits your future ML needs.
 
-### 3.2. Ty (Type Checking)
+The model we will use is based on the SigLIP architecture and is trained on the MNIST dataset for handwritten digit classification. You can find the model [here](https://huggingface.co/prithivMLmods/Mnist-Digits-SigLIP2).
 
-- Run:
-    ```sh
-    ty
-    ```
+
+- Create a new file `src/bestmlops/model.py` and add the following code:
+
+```python
+import torch
+from PIL import Image
+from transformers import AutoImageProcessor, SiglipForImageClassification
+
+# Load model and processor
+model_name = "prithivMLmods/Mnist-Digits-SigLIP2"
+model = SiglipForImageClassification.from_pretrained(model_name)
+processor = AutoImageProcessor.from_pretrained(model_name)
+
+def classify_digit(image):
+    """Predicts the digit in the given handwritten digit image."""
+    image = Image.fromarray(image).convert("RGB")
+    inputs = processor(images=image, return_tensors="pt")
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        logits = outputs.logits
+        probs = torch.nn.functional.softmax(logits, dim=1).squeeze().tolist()
+
+    labels = {
+        "0": "0", "1": "1", "2": "2", "3": "3", "4": "4",
+        "5": "5", "6": "6", "7": "7", "8": "8", "9": "9"
+    }
+    predictions = {labels[str(i)]: round(probs[i], 3) for i in range(len(probs))}
+
+    return predictions
+```
+
+This code downloads the pre-trained model and processor from Hugging Face, and defines a function `classify_digit` that takes an image as input and returns the predicted digit probabilities.
+
+To test this locally, we can use the `gradio` library to create a simple web interface for our model.
+
+- Create a new file `src/bestmlops/local_deploy.py` and add the following code:
+
+```python
+import gradio as gr
+
+from bestmlops.model import classify_digit
+
+# Create Gradio interface
+iface = gr.Interface(
+    fn=classify_digit,
+    inputs=gr.Image(type="numpy"),
+    outputs=gr.Label(label="Prediction Scores"),
+    title="MNIST Digit Classification 🔢",
+    description="Upload a handwritten digit image (0-9) to recognize it using MNIST-Digits-SigLIP2.",
+)
+
+def deploy_model():
+    """
+    Function to deploy the model.
+    This function is called when the Gradio app is launched.
+    """
+    iface.launch()
+
+
+# Launch the app
+if __name__ == "__main__":
+    deploy_model()
+```
+
+### 3.2. Install the required libraries
+
+Now that we have the model code, lets install the required libraries to run it. We will use `uv` to add the necessary dependencies:
+
+```sh
+uv add transformers torch pillow gradio
+```
+
+You might notice, that this time we are not using `--group dev` flag. This is because these libraries are required to run the model, and we want them to be available in the production environment as well. Later on when we install the dependencies for the project during deployment, we have the option of only the production dependencies (those that are not in the `dev` group). This is a really powerful feature of `uv`.
+
+
+### 3.3. Run the model locally
+
+We can now run the model locally using Gradio. Of course, we can use `uv` to run the `local_deploy.py` file directly, but since we might want to make it obvious to anyone looking at our python project that this is one of the scripts we intend for them to use, lets define it as an entry point in our `pyproject.toml` file. Open the `pyproject.toml` file and add the following lines under the `[project.scripts]` section:
+
+```toml
+local_deploy = "bestmlops.local_deploy:deploy_model"
+```
+
+On the left is the script name that we will use to run the model, and on the right is the function that will be called when we run the script. You can see that we are qualifying the function with the module name(`bestmlops.local_deploy`) , and the function name ( `deploy_model`), separated by a colon.
+
+You can now run the model locally using the following command:
+
+```sh
+uv run local_deploy
+```
+
+Once `gradio` starts, it will provide you with a local URL where you can upload images of handwritten digits (0-9) and see the model's predictions. Look for the link in the terminal output, it should look something like this:
+
+```
+* Running on local URL:  http://127.0.0.1:7860
+```
+
+Try experimenting with different handwritten digit images to see how well the model performs. You could even try to see if it works with photos of handwritten digits you take with your phone!
+
+
 
 ---
 
-## 4. Model Training with Hugging Face
+## 4. API Crafting
 
-### 4.1. Use Datasets
+We finally have a working model! While we can interact with it locally using Gradio, it is a rigid interface that lacks some functionality we expect from an API. To make our model more accessible, we will create a REST API for our model using [FastAPI](https://fastapi.tiangolo.com/#installation), a modern web framework for building APIs with Python.
 
-- Example:
-    ```python
-    from datasets import load_dataset
+### 4.1. Getting started with FastAPI
 
-    dataset = load_dataset("imdb")
-    print(dataset)
-    ```
+First of all, as you might have guessed, we need to install FastAPI.Let's add these dependencies to our project:
+
+```sh
+uv add "fastapi[standard]"
+```
+
+- Create a new file `src/bestmlops/api.py` and add the following code:
+
+```python
+from typing import Union
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int, q: Union[str, None] = None):
+    return {"item_id": item_id, "q": q}
+```
+
+This is a basic FastAPI application with two endpoints. The first endpoint (`/`) returns a simple JSON response, and the second endpoint (`/items/{item_id}`) takes an `item_id` as a path parameter and an optional query parameter `q`.
+
+Run the FastAPI application locally with:
+
+```sh
+fastapi dev src/bestmlops/api.py --port 8070
+```
+Experiment a bit with the API by visiting it on the port you defined. Try removing the `--port` flag, which port does FastAPI use by default?
+
+### 4.2. Creating the model endpoint
+
+#### Exercise
+Now that you have a feel for how FastAPI works, create an endpoint for the model. For inspiration, take a look at the `local_deploy.py` file we created earlier. You can use the `classify_digit` function from the `model.py` file to process the image input and return the predictions.
+
+
 
 ### 4.2. Train a Model
 
