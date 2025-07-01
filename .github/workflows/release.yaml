@@ -24,6 +24,7 @@ jobs:
 
     - name: Build and push
       run: |
-        IMAGE=ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
-        docker build -t $IMAGE .
-        docker push $IMAGE
+            REPO=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+            IMAGE=ghcr.io/$REPO:${{ github.event.release.tag_name }}
+            docker build -t $IMAGE .
+            docker push $IMAGE

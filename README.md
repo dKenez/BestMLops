@@ -507,7 +507,7 @@ GitHub Actions is a powerful tools that allows you to run automated tasks on pre
 
 Workflows are a great way to perform linting, tests, or any number of tasks on your codebase. In our case, we will create a workflow that builds and pushes our Docker image to the GitHub Container Registry (GHCR) whenever we create a new release.
 
-- Create `.github/workflows/ci.yml`:
+- Create `.github/workflows/release.yml`:
 ```yaml
 name: Build Docker Image
 
@@ -539,6 +539,9 @@ jobs:
         docker build -t $IMAGE .
         docker push $IMAGE
 ```
+
+Once you commit this file. You should see the newly defined workflow on the project repository under the "Actions" tab. Test this workflow by creating a new release on GitHub. This will trigger the workflow and build your Docker image, which will then be pushed to the GitHub Container Registry.
+
 ---
 
 ## 7. Next Steps & Resources
